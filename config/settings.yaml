@@ -1,0 +1,80 @@
+# Основной конфигурационный файл бота
+
+solana:
+  # RPC endpoints (обязательно замените YOUR_API_KEY на реальный ключ от Helius или QuickNode)
+  rpc:
+    http: "https://mainnet.helius-rpc.com/?api-key=4baaa857-30ba-472b-a03e-a11be77c6a69"
+    ws: "wss://mainnet.helius-rpc.com/?api-key=4baaa857-30ba-472b-a03e-a11be77c6a69"
+    # Резервные публичные endpoints (медленнее, но бесплатно)
+    fallback_http: "https://api.mainnet-beta.solana.com"
+    fallback_ws: "wss://api.mainnet-beta.solana.com"
+
+  # Конфигурация торгового кошелька
+  wallet:
+    # Публичный адрес вашего кошелька (для проверки)
+    public_key: "C4UG9AgEDZBgNHtCrpxKCJ7sS6hW8tfaHMCSVM5Z9eCk"
+    # Путь к файлу с приватным ключом в формате base58
+    # ВАЖНО: Этот файл должен быть в .gitignore и иметь права 600 (chmod 600)
+    key_path: "config/wallet.key"
+
+  # Program IDs (константы Solana)
+  programs:
+    raydium_amm: "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"  # Raydium AMM v4
+    token_program: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"  # SPL Token
+
+# Модуль копитрейдинга (следование за китами)
+copy_trading:
+  enabled: true
+  mode: "fixed"              # "fixed" - фиксированная сумма, "proportional" - пропорционально сделке кита
+  fixed_amount_sol: 0.1      # Сколько SOL тратить при копировании
+  max_sol_per_trade: 0.5     # Максимальная сумма одной сделки (лимит безопасности)
+  delay_ms: 2000             # Задержка перед копированием (мс) - защита от фронтраннинга
+
+  # Список отслеживаемых кошельков (адреса китов)
+  target_wallets:
+    - "2fg5QD1eD7rzNNCsvnhmXFm5hqNgwTTG8p7kQ6f3rx6f"
+    - "DkpMvCWwdNZL5UScy1eKjMkQCsyeFjhMLG2WTtmE9zQ"
+    - "gecko1QDvtNHwqY5SjXLzuDmGDUnzu7ZEmtGHRFLr9v"
+    - "EM1ZyNA3g4rr9MBzSEA36QqWd7t7cp54zDidm3YskyeU"
+    - "FJNZuVewCoZEmzPeWBQvanAgtw7NBqrW69tyRRB4HDwe"
+    - "omegoMAe1AMY5MFKQQr3JwXVy8F4eCvmBAfcpo8XAfq"
+    - "FYQU4Q4BEgNwNATMEphBtZtfkR3RamXXy6JvHnVHhjuo"
+    - "Hp5XfZfjTtZLq4ejjohWUHP2KWEaXAX2Csn9DqZovhwd"
+    - "FRa5xvWrvgYBHEukozdhJPCJRuJZcTn2WKj2u6L75Rmj"
+
+# Торговая стратегия
+strategy:
+  enabled: true
+  entry:
+    position_size_sol: 0.1   # Размер позиции для ручной/авто покупки
+    min_liquidity_sol: 5.0   # Минимальная ликвидность пула для входа
+
+  # Фильтры безопасности (анти-скам)
+  filters:
+    check_mint_authority: true       # Проверять возможность чеканки новых токенов
+    check_freeze_authority: true     # Проверять возможность заморозки токенов
+    max_top_holder_percent: 30.0     # Макс % у топ-холдера (не реализовано в упрощенной версии)
+    check_liquidity: true            # Проверять минимальную ликвидность
+
+# Параметры выхода из позиций
+exit:
+  take_profit_percent: 50.0    # Тейк-профит в процентах (50% = продажа при +50%)
+  stop_loss_percent: 10.0      # Стоп-лосс (0 = отключен)
+  max_hold_time_min: 60        # Максимальное время удержания в минутах (0 = бесконечно)
+
+# Комиссии транзакций (priority fees в lamports)
+fees:
+  buy: 10000     # 0.00001 SOL - приоритет для покупки
+  sell: 10000    # 0.00001 SOL - приоритет для продажи
+
+# Настройки логирования
+logging:
+  level: "INFO"  # Уровень: DEBUG, INFO, WARNING, ERROR
+  file: "logs/bot.log"
+  format: "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+  max_size_mb: 50    # Максимальный размер файла лога перед ротацией
+  backup_count: 3    # Сколько старых логов хранить
+
+# База данных SQLite
+database:
+  path: "data/trades.db"
