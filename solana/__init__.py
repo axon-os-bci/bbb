@@ -1,1 +1,0 @@
-# Пакет solana - интеграции с Solana экосистемой (Raydium, Serum, Jupiter)
