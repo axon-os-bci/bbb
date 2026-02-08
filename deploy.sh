@@ -2,7 +2,7 @@
 # GMGN Solana Bot Deployment Script
 # Для Ubuntu 24.04 LTS (4GB RAM, 2 core)
 
-set -euo pipefail  # Добавлено pipefail для строгости
+set -euo pipefail
 
 # Цвета для вывода
 RED='\033[0;31m'
@@ -12,17 +12,16 @@ NC='\033[0m' # No Color
 
 echo -e "${GREEN}=== GMGN Solana Bot Deployment ===${NC}"
 
-# ЗАГРУЗКА ПЕРЕМЕННЫХ ИЗ .env (безопасно, с кавычками)
+# ЗАГРУЗКА ПЕРЕМЕННЫХ ИЗ .env
 ENV_FILE=".env"
 
 if [ ! -f "$ENV_FILE" ]; then
     echo -e "${RED}❌ Файл $ENV_FILE не найден в текущей директории ($(pwd))!${NC}"
-    echo "Создайте .env файл на основе .env.example"
     exit 1
 fi
 
-# Безопасная загрузка .env (поддержка значений с пробелами и #)
-set -a  # Автоэкспорт всех переменных
+# Безопасная загрузка .env
+set -a
 source "$ENV_FILE"
 set +a
 
@@ -63,7 +62,7 @@ echo -e "${YELLOW}[1/8] Обновление пакетов...${NC}"
 apt-get update && apt-get upgrade -y
 
 # 2. Установка Python 3.12 и зависимостей
-echo -e "${YELLOW}[2/8] Установка Python ${PYTHON_VERSION} и системных зависимостей...${NC}"
+echo -e "${YELLOW}[2/8] Установка Python ${PYTHON_VERSION}...${NC}"
 apt-get install -y \
     python${PYTHON_VERSION} \
     python${PYTHON_VERSION}-venv \
@@ -82,7 +81,7 @@ apt-get install -y \
     libffi-dev \
     build-essential
 
-# 3. Создание пользователя для бота (без логина)
+# 3. Создание пользователя для бота
 echo -e "${YELLOW}[3/8] Создание пользователя ${BOT_USER}...${NC}"
 if ! id "$BOT_USER" &>/dev/null; then
     useradd -r -s /bin/false -d ${BOT_DIR} -m ${BOT_USER}
@@ -94,7 +93,7 @@ echo -e "${YELLOW}[4/8] Настройка директорий...${NC}"
 mkdir -p ${BOT_DIR}/{config,logs,data}
 chown -R ${BOT_USER}:${BOT_USER} ${BOT_DIR}
 chmod 750 ${BOT_DIR}
-chmod 700 ${BOT_DIR}/config  # Только владелец может видеть config
+chmod 700 ${BOT_DIR}/config
 
 # 5. Клонирование репозитория
 echo -e "${YELLOW}[5/8] Клонирование репозитория...${NC}"
@@ -102,38 +101,43 @@ echo -e "${YELLOW}[5/8] Клонирование репозитория...${NC}"
 cd /tmp
 rm -rf bbb_temp_clone
 
-# Клонирование от имени пользователя бота
-if ! sudo -u ${BOT_USER} git clone ${REPO_URL} bbb_temp_clone; then
+# Клонирование от root (пользователь solbot не имеет прав на /tmp и shell)
+if ! git clone ${REPO_URL} bbb_temp_clone; then
     echo -e "${RED}Ошибка: Не удалось клонировать репозиторий ${REPO_URL}${NC}"
-    echo -e "${YELLOW}Проверьте доступность GitHub и правильность URL${NC}"
     exit 1
 fi
 
-# Проверяем, что склонировалось
 if [ ! -d "/tmp/bbb_temp_clone" ]; then
     echo -e "${RED}Ошибка: Директория после клонирования не найдена${NC}"
     exit 1
 fi
 
 # Копирование файлов
-echo -e "${YELLOW}Копирование файлов бота...${NC}"
+echo -e "${YELLOW}Копирование файлов...${NC}"
 cp -r /tmp/bbb_temp_clone/* ${BOT_DIR}/
+cp -r /tmp/bbb_temp_clone/.[^.]* ${BOT_DIR}/ 2>/dev/null || true
 
 # Очистка
 rm -rf /tmp/bbb_temp_clone
 
-# Настройка прав (снова, после копирования)
+# Настройка прав
 chown -R ${BOT_USER}:${BOT_USER} ${BOT_DIR}
 chmod 700 ${BOT_DIR}/config
 
 # 6. Создание виртуального окружения
 echo -e "${YELLOW}[6/8] Установка Python зависимостей...${NC}"
 cd ${BOT_DIR}
+
+if [ ! -f "requirements.txt" ]; then
+    echo -e "${RED}❌ requirements.txt не найден!${NC}"
+    exit 1
+fi
+
 sudo -u ${BOT_USER} python${PYTHON_VERSION} -m venv venv
 sudo -u ${BOT_USER} ${BOT_DIR}/venv/bin/pip install --upgrade pip
 sudo -u ${BOT_USER} ${BOT_DIR}/venv/bin/pip install -r requirements.txt
 
-# 7. Создание systemd сервиса (HERE-DOC с переменными)
+# 7. Создание systemd сервиса
 echo -e "${YELLOW}[7/8] Создание системного сервиса...${NC}"
 cat > /etc/systemd/system/${BOT_SERVICE}.service << EOF
 [Unit]
@@ -151,16 +155,13 @@ Environment="PYTHONUNBUFFERED=1"
 Environment="PYTHONDONTWRITEBYTECODE=1"
 Environment="HELIUS_API_KEY=${HELIUS_API_KEY}"
 
-# Запуск бота
 ExecStart=${BOT_DIR}/venv/bin/python main.py
 
-# Перезапуск при падении
 Restart=always
 RestartSec=10
 StartLimitInterval=60s
 StartLimitBurst=3
 
-# Безопасность
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
@@ -169,7 +170,6 @@ ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
 
-# Логирование
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=gmgn-bot
@@ -214,6 +214,7 @@ echo "   sudo cp /path/to/wallet.key ${BOT_DIR}/config/"
 echo "   sudo chmod 600 ${BOT_DIR}/config/wallet.key"
 echo "   sudo chown ${BOT_USER}:${BOT_USER} ${BOT_DIR}/config/wallet.key"
 echo ""
-echo "2. 📝 Создайте ${BOT_DIR}/config/settings.yaml"
+echo "2. 📝 Проверьте ${BOT_DIR}/config/settings.yaml"
 echo ""
 echo "3. 🚀 Запустите: sudo systemctl start ${BOT_SERVICE}"
+echo "   sudo journalctl -u ${BOT_SERVICE} -f"

@@ -8,7 +8,7 @@ USER="solbot"
 show_help() {
     echo "GMGN Bot Control Utility"
     echo ""
-    echo "Использование: $0 {start|stop|restart|status|logs|config|backup|update}"
+    echo "Использование: $0 {start|stop|restart|status|logs|config|backup|update|wallet}"
     echo ""
     echo "Команды:"
     echo "  start     - Запустить бота"
@@ -49,11 +49,12 @@ case "$1" in
         sudo systemctl status ${SERVICE} --no-pager
 
         echo ""
-        echo "=== Последние сделки ==="
+        echo "=== Последние позиции ==="
         if [ -f "${BOT_DIR}/data/trades.db" ]; then
+            # Исправленный SQL под реальную схему БД
             sudo sqlite3 ${BOT_DIR}/data/trades.db \
-                "SELECT token_address, entry_sol_amount, status, entry_time
-                 FROM positions ORDER BY entry_time DESC LIMIT 5;" 2>/dev/null || echo "База данных пуста"
+                "SELECT token_address, entry_sol_amount, COALESCE(pnl_percent, 0), exit_reason
+                 FROM positions ORDER BY rowid DESC LIMIT 5;" 2>/dev/null || echo "База данных пуста или ошибка доступа"
         else
             echo "База данных не найдена"
         fi
@@ -123,26 +124,31 @@ case "$1" in
 
     wallet)
         echo "Проверка баланса кошелька..."
-        # Требует установки solana-cli или использования Python скрипта
         if [ -f "${BOT_DIR}/venv/bin/python" ]; then
             sudo -u ${USER} ${BOT_DIR}/venv/bin/python -c "
 import sys
 sys.path.insert(0, '${BOT_DIR}')
+import asyncio
 from solana.rpc.async_api import AsyncClient
 from solders.pubkey import Pubkey
-import asyncio
+import os
 
 async def check():
     try:
-        with open('${BOT_DIR}/config/settings.yaml', 'r') as f:
+        # Пытаемся прочитать из окружения или config
+        pubkey_str = os.environ.get('PUBLIC_KEY', '')
+        if not pubkey_str:
+            # Читаем из settings.yaml если есть
             import yaml
-            config = yaml.safe_load(f)
-            pubkey = config['solana']['wallet']['public_key']
+            with open('${BOT_DIR}/config/settings.yaml', 'r') as f:
+                config = yaml.safe_load(f)
+                pubkey_str = config['solana']['wallet']['public_key']
 
+        pubkey = Pubkey.from_string(pubkey_str)
         client = AsyncClient('https://api.mainnet-beta.solana.com')
-        resp = await client.get_balance(Pubkey.from_string(pubkey))
+        resp = await client.get_balance(pubkey)
         balance = resp.value / 1e9
-        print(f'Адрес: {pubkey}')
+        print(f'Адрес: {pubkey_str}')
         print(f'Баланс: {balance:.4f} SOL')
         await client.close()
     except Exception as e:

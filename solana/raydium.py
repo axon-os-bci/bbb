@@ -514,21 +514,14 @@ async def ensure_ata(
 ) -> Tuple[Pubkey, Optional[Instruction]]:
     """
     Проверка существования ATA и возврат адреса.
-    Если ATA не существует, в реальном коде здесь нужно создать инструкцию создания.
-
-    Returns:
-        (ata_address, create_instruction_or_None)
     """
     ata = get_associated_token_address(owner, mint)
 
     try:
         resp = await client.get_account_info(ata)
         if resp.value is None:
-            # ATA не существует - в production здесь нужно вернуть инструкцию создания
-            # from spl.token.instructions import create_associated_token_account
-            # ix = create_associated_token_account(payer, owner, mint)
             logger.info(f"ATA {ata} не существует, требуется создание")
-            return ata, None  # Заглушка, в production вернуть инструкцию
+            return ata, None  # В production здесь инструкция создания
         return ata, None
     except Exception as e:
         logger.error(f"Ошибка проверки ATA: {e}")

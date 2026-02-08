@@ -107,9 +107,9 @@ class TradeExecutor:
         # 4. Подготовка ATA (Associated Token Accounts)
         # ATA для SOL (WSOL) - всегда существует или создается
         # ATA для токена - создаем если не существует
-        ata_sol = await ensure_ata(self.client, self.wallet_pubkey, WRAPPED_SOL_MINT, self.wallet_pubkey)
-        ata_token = await ensure_ata(self.client, self.wallet_pubkey, Pubkey.from_string(token_mint),
-                                     self.wallet_pubkey)
+        ata_sol, _ = await ensure_ata(self.client, self.wallet_pubkey, WRAPPED_SOL_MINT, self.wallet_pubkey)
+        ata_token, _ = await ensure_ata(self.client, self.wallet_pubkey, Pubkey.from_string(token_mint),
+                                        self.wallet_pubkey)
 
         # 5. Получение резервов пула (реальный RPC)
         reserve_base, reserve_quote = await self.pool_loader.get_reserves(pool_keys)
