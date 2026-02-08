@@ -1,0 +1,63 @@
+solana:
+  rpc:
+    http: "https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
+    ws: "wss://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
+    fallback_http: "https://api.mainnet-beta.solana.com"
+    fallback_ws: "wss://api.mainnet-beta.solana.com"
+
+  wallet:
+    public_key: "{PUBLIC_KEY}"
+    key_path: "config/wallet.key"
+
+  programs:
+    raydium_amm: "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
+    token_program: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+    openbook: "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
+    ata_program: "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+
+copy_trading:
+  enabled: true
+  mode: "fixed"
+  fixed_amount_sol: 0.1
+  max_sol_per_trade: 0.5
+  delay_ms: 2000
+  target_wallets:
+    - "2fg5QD1eD7rzNNCsvnhmXFm5hqNgwTTG8p7kQ6f3rx6f"
+    - "DkpMvCWwdNZL5UScy1eKjMkQCsyeFjhMLG2WTtmE9zQ"
+    - "gecko1QDvtNHwqY5SjXLzuDmGDUnzu7ZEmtGHRFLr9v"
+    - "EM1ZyNA3g4rr9MBzSEA36QqWd7t7cp54zDidm3YskyeU"
+    - "FJNZuVewCoZEmzPeWBQvanAgtw7NBqrW69tyRRB4HDwe"
+    - "omegoMAe1AMY5MFKQQr3JwXVy8F4eCvmBAfcpo8XAfq"
+    - "FYQU4Q4BEgNwNATMEphBtZtfkR3RamXXy6JvHnVHhjuo"
+    - "Hp5XfZfjTtZLq4ejjohWUHP2KWEaXAX2Csn9DqZovhwd"
+    - "FRa5xvWrvgYBHEukozdhJPCJRuJZcTn2WKj2u6L75Rmj"
+
+strategy:
+  enabled: true
+  entry:
+    position_size_sol: 0.1
+    min_liquidity_sol: 5.0
+  filters:
+    check_mint_authority: true
+    check_freeze_authority: true
+    max_top_holder_percent: 30.0
+    check_liquidity: true
+
+exit:
+  take_profit_percent: 50.0
+  stop_loss_percent: 10.0
+  max_hold_time_min: 60
+
+fees:
+  buy: 10000
+  sell: 10000
+
+logging:
+  level: "INFO"
+  file: "logs/bot.log"
+  format: "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+  max_size_mb: 100
+  backup_count: 20
+
+database:
+  path: "data/trades.db"

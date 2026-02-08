@@ -1,3 +1,5 @@
 config/wallet.key
 __pycache__/
 .env
+deploy.sh
+gmgn-control.sh
