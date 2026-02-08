@@ -1,12 +1,12 @@
 solana:
   rpc:
-    http: "https://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
-    ws: "wss://mainnet.helius-rpc.com/?api-key={HELIUS_API_KEY}"
+    http: "https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}"
+    ws: "wss://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}"
     fallback_http: "https://api.mainnet-beta.solana.com"
     fallback_ws: "wss://api.mainnet-beta.solana.com"
 
   wallet:
-    public_key: "{PUBLIC_KEY}"
+    public_key: "${PUBLIC_KEY}"
     key_path: "config/wallet.key"
 
   programs:

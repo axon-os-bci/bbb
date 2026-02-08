@@ -2,7 +2,7 @@
 # GMGN Solana Bot Deployment Script
 # Для Ubuntu 24.04 LTS (4GB RAM, 2 core)
 
-set -e  # Остановка при любой ошибке
+set -euo pipefail  # Добавлено pipefail для строгости
 
 # Цвета для вывода
 RED='\033[0;31m'
@@ -12,26 +12,33 @@ NC='\033[0m' # No Color
 
 echo -e "${GREEN}=== GMGN Solana Bot Deployment ===${NC}"
 
-# ЗАГРУЗКА ПЕРЕМЕННЫХ ИЗ .env
+# ЗАГРУЗКА ПЕРЕМЕННЫХ ИЗ .env (безопасно, с кавычками)
 ENV_FILE=".env"
 
 if [ ! -f "$ENV_FILE" ]; then
-    echo -e "${RED}❌ Файл $ENV_FILE не найден в текущей директории!${NC}"
+    echo -e "${RED}❌ Файл $ENV_FILE не найден в текущей директории ($(pwd))!${NC}"
     echo "Создайте .env файл на основе .env.example"
     exit 1
 fi
 
-# Загружаем переменные, игнорируя комментарии и пустые строки
-export $(grep -v '^#' "$ENV_FILE" | grep -v '^$' | xargs -d '\n')
+# Безопасная загрузка .env (поддержка значений с пробелами и #)
+set -a  # Автоэкспорт всех переменных
+source "$ENV_FILE"
+set +a
 
 # Проверка обязательных переменных
-if [ -z "$REPO_URL" ]; then
+if [ -z "${REPO_URL:-}" ]; then
     echo -e "${RED}❌ REPO_URL не задан в $ENV_FILE${NC}"
     exit 1
 fi
 
-if [ -z "$HELIUS_API_KEY" ]; then
+if [ -z "${HELIUS_API_KEY:-}" ]; then
     echo -e "${RED}❌ HELIUS_API_KEY не задан в $ENV_FILE${NC}"
+    exit 1
+fi
+
+if [ -z "${PUBLIC_KEY:-}" ]; then
+    echo -e "${RED}❌ PUBLIC_KEY не задан в $ENV_FILE${NC}"
     exit 1
 fi
 
@@ -87,21 +94,24 @@ echo -e "${YELLOW}[4/8] Настройка директорий...${NC}"
 mkdir -p ${BOT_DIR}/{config,logs,data}
 chown -R ${BOT_USER}:${BOT_USER} ${BOT_DIR}
 chmod 750 ${BOT_DIR}
+chmod 700 ${BOT_DIR}/config  # Только владелец может видеть config
 
-# 4.1. Клонирование репозитория с GitHub
+# 5. Клонирование репозитория
 echo -e "${YELLOW}[5/8] Клонирование репозитория...${NC}"
 
-# Очистка временной директории
 cd /tmp
 rm -rf bbb_temp_clone
 
 # Клонирование от имени пользователя бота
 if ! sudo -u ${BOT_USER} git clone ${REPO_URL} bbb_temp_clone; then
     echo -e "${RED}Ошибка: Не удалось клонировать репозиторий ${REPO_URL}${NC}"
-    echo -e "${YELLOW}Проверьте:${NC}"
-    echo "  - Доступность GitHub"
-    echo "  - Правильность URL в .env"
-    echo "  - Доступ к приватному репо (если нужен SSH ключ)"
+    echo -e "${YELLOW}Проверьте доступность GitHub и правильность URL${NC}"
+    exit 1
+fi
+
+# Проверяем, что склонировалось
+if [ ! -d "/tmp/bbb_temp_clone" ]; then
+    echo -e "${RED}Ошибка: Директория после клонирования не найдена${NC}"
     exit 1
 fi
 
@@ -112,7 +122,7 @@ cp -r /tmp/bbb_temp_clone/* ${BOT_DIR}/
 # Очистка
 rm -rf /tmp/bbb_temp_clone
 
-# Настройка прав
+# Настройка прав (снова, после копирования)
 chown -R ${BOT_USER}:${BOT_USER} ${BOT_DIR}
 chmod 700 ${BOT_DIR}/config
 
@@ -123,7 +133,7 @@ sudo -u ${BOT_USER} python${PYTHON_VERSION} -m venv venv
 sudo -u ${BOT_USER} ${BOT_DIR}/venv/bin/pip install --upgrade pip
 sudo -u ${BOT_USER} ${BOT_DIR}/venv/bin/pip install -r requirements.txt
 
-# 7. Создание systemd сервиса
+# 7. Создание systemd сервиса (HERE-DOC с переменными)
 echo -e "${YELLOW}[7/8] Создание системного сервиса...${NC}"
 cat > /etc/systemd/system/${BOT_SERVICE}.service << EOF
 [Unit]
@@ -171,7 +181,7 @@ EOF
 systemctl daemon-reload
 systemctl enable ${BOT_SERVICE}
 
-# 8. Настройка логов (logrotate)
+# 8. Настройка логов
 echo -e "${YELLOW}[8/8] Настройка ротации логов...${NC}"
 cat > /etc/logrotate.d/${BOT_SERVICE} << EOF
 ${BOT_DIR}/logs/*.log {
@@ -196,26 +206,14 @@ ufw default allow outgoing
 ufw allow 22/tcp
 ufw --force enable
 
-# Финальные инструкции
 echo -e "${GREEN}=== Установка завершена! ===${NC}"
 echo ""
 echo -e "${YELLOW}⚠️  ВАЖНЫЕ СЛЕДУЮЩИЕ ШАГИ:${NC}"
-echo ""
-echo "1. 🔑 Скопируйте приватный ключ кошелька:"
+echo "1. 🔑 Скопируйте приватный ключ:"
 echo "   sudo cp /path/to/wallet.key ${BOT_DIR}/config/"
 echo "   sudo chmod 600 ${BOT_DIR}/config/wallet.key"
 echo "   sudo chown ${BOT_USER}:${BOT_USER} ${BOT_DIR}/config/wallet.key"
 echo ""
-echo "2. 📝 Создайте config/settings.yaml с плейсхолдерами:"
-echo "   sudo nano ${BOT_DIR}/config/settings.yaml"
-echo "   (Используйте {HELIUS_API_KEY} и {PUBLIC_KEY} для подстановки)"
+echo "2. 📝 Создайте ${BOT_DIR}/config/settings.yaml"
 echo ""
-echo "3. 🚀 Запустите бота:"
-echo "   sudo systemctl start ${BOT_SERVICE}"
-echo ""
-echo "4. 📊 Проверьте статус:"
-echo "   sudo systemctl status ${BOT_SERVICE}"
-echo "   sudo journalctl -u ${BOT_SERVICE} -f"
-echo ""
-echo -e "${GREEN}Управление:${NC}"
-echo "  start | stop | restart | status | logs"
+echo "3. 🚀 Запустите: sudo systemctl start ${BOT_SERVICE}"

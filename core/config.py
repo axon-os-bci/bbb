@@ -4,6 +4,7 @@
 """
 
 import os
+import re
 from pathlib import Path
 from typing import List
 from pydantic import BaseModel, Field, validator
@@ -115,7 +116,7 @@ class BotConfig(BaseModel):
 def load_config(config_path: str = "config/settings.yaml") -> BotConfig:
     """
     Загружает конфиг с подстановкой переменных окружения.
-    {HELIUS_API_KEY} -> значение из .env
+    Поддерживает синтаксис ${VAR_NAME} и {VAR_NAME}
     """
     path = Path(config_path)
     if not path.exists():
@@ -125,12 +126,24 @@ def load_config(config_path: str = "config/settings.yaml") -> BotConfig:
     with open(path, 'r', encoding='utf-8') as f:
         template = f.read()
 
-    # Подставляем переменные окружения {VAR_NAME}
-    try:
-        filled_template = template.format(**os.environ)
-    except KeyError as e:
-        raise ValueError(f"Не найдена переменная окружения: {e}. "
-                         f"Проверьте файл .env и убедитесь, что он загружен.")
+    # Безопасная подстановка: только {VAR_NAME} или ${VAR_NAME}
+    # Игнорируем {слово} которых нет в env (как в Python format strings логов)
+    pattern = re.compile(r'\$\{(\w+)\}|\{(\w+)\}')
+
+    def replace_var(match):
+        var_name = match.group(1) or match.group(2)
+        if var_name in os.environ:
+            return os.environ[var_name]
+        # Если переменная не найдена, оставляем как есть (для Python форматов в логах)
+        return match.group(0)
+
+    filled_template = pattern.sub(replace_var, template)
+
+    # Проверка критичных переменных
+    required_vars = ['HELIUS_API_KEY', 'PUBLIC_KEY']
+    missing = [var for var in required_vars if var not in os.environ]
+    if missing:
+        raise ValueError(f"Отсутствуют обязательные переменные окружения: {missing}")
 
     # Парсим YAML
     config_dict = yaml.safe_load(filled_template)
