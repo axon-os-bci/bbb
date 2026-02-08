@@ -1,7 +1,6 @@
 # Основные зависимости для работы с Solana
 solders>=0.21.0              # Работа с ключами, транзакциями, инструкциями
-solana>=0.30.0               # RPC клиент для Solana
-solana-py[spl]>=0.30.0       # SPL Token программы (ATA, инструкции токенов)
+solana>=0.36.0               # RPC клиент для Solana (включает SPL токены)
 websockets>=12.0             # WebSocket подключение к RPC
 aiohttp>=3.9.0               # HTTP запросы (Jupiter API, Raydium API)
 PyYAML>=6.0.1                # Парсинг конфигурации
