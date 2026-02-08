@@ -18,9 +18,9 @@ solana:
 copy_trading:
   enabled: true
   mode: "fixed"
-  fixed_amount_sol: 0.1
+  fixed_amount_sol: 0.49   # Копируем крупнее
   max_sol_per_trade: 0.5
-  delay_ms: 2000
+  delay_ms: 1000          # Меньше задержки (быстрее копируем)
   target_wallets:
     - "2fg5QD1eD7rzNNCsvnhmXFm5hqNgwTTG8p7kQ6f3rx6f"
     - "DkpMvCWwdNZL5UScy1eKjMkQCsyeFjhMLG2WTtmE9zQ"
@@ -35,8 +35,8 @@ copy_trading:
 strategy:
   enabled: true
   entry:
-    position_size_sol: 0.1
-    min_liquidity_sol: 5.0
+    position_size_sol: 0.5
+    min_liquidity_sol: 20.0
   filters:
     check_mint_authority: true
     check_freeze_authority: true
@@ -44,20 +44,20 @@ strategy:
     check_liquidity: true
 
 exit:
-  take_profit_percent: 50.0
-  stop_loss_percent: 10.0
-  max_hold_time_min: 60
+  take_profit_percent: 98.0
+  stop_loss_percent: 50.0
+  max_hold_time_min: 720
 
 fees:
-  buy: 10000
-  sell: 10000
+  buy: 500000     #  (0.0005 SOL)
+  sell: 500000    #  (0.0005 SOL)
 
 logging:
   level: "INFO"
   file: "logs/bot.log"
   format: "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
-  max_size_mb: 100
-  backup_count: 20
+  max_size_mb: 50
+  backup_count: 3
 
 database:
   path: "data/trades.db"

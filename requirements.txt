@@ -1,9 +1,10 @@
 # Основные зависимости для работы с Solana
-solders>=0.21.0              # Работа с ключами, транзакциями, инструкциями
-solana>=0.36.0               # RPC клиент для Solana (включает SPL токены)
+solders>=0.23.0,<0.24.0      # Совместимо с solana 0.36.x
+solana>=0.36.0,<0.37.0       # RPC клиент для Solana
 websockets>=12.0             # WebSocket подключение к RPC
 aiohttp>=3.9.0               # HTTP запросы (Jupiter API, Raydium API)
 PyYAML>=6.0.1                # Парсинг конфигурации
 pydantic>=2.5.0              # Валидация данных
 pydantic-settings>=2.1.0     # Настройки Pydantic
 python-dotenv>=1.0.0         # Загрузка .env файлов
+aiosqlite>=0.19.0

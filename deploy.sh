@@ -42,6 +42,7 @@ if [ -z "${PUBLIC_KEY:-}" ]; then
 fi
 
 echo -e "${YELLOW}📦 Репозиторий: $REPO_URL${NC}"
+echo -e "${YELLOW}🔑 Кошелек: ${PUBLIC_KEY:0:16}...${NC}"
 
 # Конфигурация
 BOT_USER="solbot"
@@ -58,11 +59,11 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # 1. Обновление системы
-echo -e "${YELLOW}[1/8] Обновление пакетов...${NC}"
+echo -e "${YELLOW}[1/9] Обновление пакетов...${NC}"
 apt-get update && apt-get upgrade -y
 
 # 2. Установка Python 3.12 и зависимостей
-echo -e "${YELLOW}[2/8] Установка Python ${PYTHON_VERSION}...${NC}"
+echo -e "${YELLOW}[2/9] Установка Python ${PYTHON_VERSION}...${NC}"
 apt-get install -y \
     python${PYTHON_VERSION} \
     python${PYTHON_VERSION}-venv \
@@ -82,26 +83,25 @@ apt-get install -y \
     build-essential
 
 # 3. Создание пользователя для бота
-echo -e "${YELLOW}[3/8] Создание пользователя ${BOT_USER}...${NC}"
+echo -e "${YELLOW}[3/9] Создание пользователя ${BOT_USER}...${NC}"
 if ! id "$BOT_USER" &>/dev/null; then
     useradd -r -s /bin/false -d ${BOT_DIR} -m ${BOT_USER}
     usermod -aG systemd-journal ${BOT_USER}
 fi
 
 # 4. Настройка директорий
-echo -e "${YELLOW}[4/8] Настройка директорий...${NC}"
+echo -e "${YELLOW}[4/9] Настройка директорий...${NC}"
 mkdir -p ${BOT_DIR}/{config,logs,data}
 chown -R ${BOT_USER}:${BOT_USER} ${BOT_DIR}
 chmod 750 ${BOT_DIR}
 chmod 700 ${BOT_DIR}/config
 
 # 5. Клонирование репозитория
-echo -e "${YELLOW}[5/8] Клонирование репозитория...${NC}"
+echo -e "${YELLOW}[5/9] Клонирование репозитория...${NC}"
 
 cd /tmp
 rm -rf bbb_temp_clone
 
-# Клонирование от root (пользователь solbot не имеет прав на /tmp и shell)
 if ! git clone ${REPO_URL} bbb_temp_clone; then
     echo -e "${RED}Ошибка: Не удалось клонировать репозиторий ${REPO_URL}${NC}"
     exit 1
@@ -120,25 +120,91 @@ cp -r /tmp/bbb_temp_clone/.[^.]* ${BOT_DIR}/ 2>/dev/null || true
 # Очистка
 rm -rf /tmp/bbb_temp_clone
 
+# 6. ИСПРАВЛЕНИЕ КОНФЛИКТА ИМЕН (критично!)
+echo -e "${YELLOW}[6/9] Исправление конфликта имён модулей...${NC}"
+if [ -d "${BOT_DIR}/solana" ]; then
+    echo "Переименование solana/ -> solana_modules/ ..."
+    mv ${BOT_DIR}/solana ${BOT_DIR}/solana_modules
+
+    # Создаем __init__.py если отсутствует
+    touch ${BOT_DIR}/solana_modules/__init__.py
+    chown ${BOT_USER}:${BOT_USER} ${BOT_DIR}/solana_modules/__init__.py
+
+    # Обновляем импорты: ТОЛЬКО локальные модули (raydium), НЕ трогаем solana.rpc (PyPI)
+    # Используем точечное исправление только для известных локальных модулей
+    find ${BOT_DIR} -name "*.py" -type f -exec sed -i 's/from solana\.raydium/from solana_modules.raydium/g' {} \;
+    find ${BOT_DIR} -name "*.py" -type f -exec sed -i 's/import solana\.raydium/import solana_modules.raydium/g' {} \;
+
+    echo -e "${GREEN}✅ Модуль переименован в solana_modules, импорты исправлены${NC}"
+fi
+
 # Настройка прав
 chown -R ${BOT_USER}:${BOT_USER} ${BOT_DIR}
 chmod 700 ${BOT_DIR}/config
 
-# 6. Создание виртуального окружения
-echo -e "${YELLOW}[6/8] Установка Python зависимостей...${NC}"
+# 7. Создание виртуального окружения
+echo -e "${YELLOW}[7/9] Установка Python зависимостей...${NC}"
 cd ${BOT_DIR}
 
+# Исправляем requirements.txt (добавляем недостающие зависимости)
 if [ ! -f "requirements.txt" ]; then
-    echo -e "${RED}❌ requirements.txt не найден!${NC}"
-    exit 1
+    echo -e "${RED}❌ requirements.txt не найден! Создаю стандартный...${NC}"
+    cat > requirements.txt << 'REQEOF'
+solders>=0.23.0,<0.24.0
+solana>=0.36.0,<0.37.0
+websockets>=12.0
+aiohttp>=3.9.0
+PyYAML>=6.0.1
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+python-dotenv>=1.0.0
+aiosqlite>=0.19.0
+REQEOF
+fi
+
+# Проверяем и добавляем aiosqlite если отсутствует
+if ! grep -q "^aiosqlite" requirements.txt; then
+    echo "aiosqlite>=0.19.0" >> requirements.txt
+    echo -e "${YELLOW}Добавлен aiosqlite в requirements.txt${NC}"
+fi
+
+# Проверяем совместимость solders и solana
+if grep -q "solders>=0.21.0" requirements.txt; then
+    sed -i 's/solders>=0.21.0/solders>=0.23.0,<0.24.0/' requirements.txt
 fi
 
 sudo -u ${BOT_USER} python${PYTHON_VERSION} -m venv venv
 sudo -u ${BOT_USER} ${BOT_DIR}/venv/bin/pip install --upgrade pip
 sudo -u ${BOT_USER} ${BOT_DIR}/venv/bin/pip install -r requirements.txt
 
-# 7. Создание systemd сервиса
-echo -e "${YELLOW}[7/8] Создание системного сервиса...${NC}"
+# 8. Проверка установки и исправление импортов (на всякий случай)
+echo -e "${YELLOW}[8/9] Проверка установки solana...${NC}"
+
+# Восстанавливаем PyPI импорты solana.rpc, если они были случайно заменены
+find ${BOT_DIR} -name "*.py" -type f -exec sed -i 's/from solana_modules\.rpc/from solana.rpc/g' {} \;
+find ${BOT_DIR} -name "*.py" -type f -exec sed -i 's/import solana_modules\.rpc/import solana.rpc/g' {} \;
+
+if ! sudo -u ${BOT_USER} ${BOT_DIR}/venv/bin/python -c "from solana.rpc.async_api import AsyncClient; print('OK')" 2>/dev/null; then
+    echo -e "${RED}❌ Ошибка: Не удалось импортировать solana.rpc (PyPI)${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✅ PyPI пакет solana установлен корректно${NC}"
+
+if ! sudo -u ${BOT_USER} ${BOT_DIR}/venv/bin/python -c "from solana_modules.raydium import RaydiumAPI; print('OK')" 2>/dev/null; then
+    echo -e "${YELLOW}⚠️ Предупреждение: Локальный модуль raydium не найден в solana_modules${NC}"
+fi
+
+# 9. Создание .env файла для бота (для systemd)
+echo -e "${YELLOW}[9/9] Настройка окружения...${NC}"
+cat > ${BOT_DIR}/.env << EOF
+HELIUS_API_KEY=${HELIUS_API_KEY}
+PUBLIC_KEY=${PUBLIC_KEY}
+EOF
+chmod 600 ${BOT_DIR}/.env
+chown ${BOT_USER}:${BOT_USER} ${BOT_DIR}/.env
+
+# 10. Создание systemd сервиса
+echo -e "${YELLOW}[Дополнительно] Создание системного сервиса...${NC}"
 cat > /etc/systemd/system/${BOT_SERVICE}.service << EOF
 [Unit]
 Description=GMGN Solana Trading Bot
@@ -153,7 +219,7 @@ WorkingDirectory=${BOT_DIR}
 Environment="PATH=${BOT_DIR}/venv/bin:/usr/local/bin:/usr/bin"
 Environment="PYTHONUNBUFFERED=1"
 Environment="PYTHONDONTWRITEBYTECODE=1"
-Environment="HELIUS_API_KEY=${HELIUS_API_KEY}"
+EnvironmentFile=${BOT_DIR}/.env
 
 ExecStart=${BOT_DIR}/venv/bin/python main.py
 
@@ -165,7 +231,7 @@ StartLimitBurst=3
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=${BOT_DIR}/logs ${BOT_DIR}/data
+ReadWritePaths=${BOT_DIR}/logs ${BOT_DIR}/data ${BOT_DIR}/.env
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
@@ -181,8 +247,8 @@ EOF
 systemctl daemon-reload
 systemctl enable ${BOT_SERVICE}
 
-# 8. Настройка логов
-echo -e "${YELLOW}[8/8] Настройка ротации логов...${NC}"
+# Настройка logrotate
+echo -e "${YELLOW}[Дополнительно] Настройка ротации логов...${NC}"
 cat > /etc/logrotate.d/${BOT_SERVICE} << EOF
 ${BOT_DIR}/logs/*.log {
     daily
@@ -214,7 +280,11 @@ echo "   sudo cp /path/to/wallet.key ${BOT_DIR}/config/"
 echo "   sudo chmod 600 ${BOT_DIR}/config/wallet.key"
 echo "   sudo chown ${BOT_USER}:${BOT_USER} ${BOT_DIR}/config/wallet.key"
 echo ""
-echo "2. 📝 Проверьте ${BOT_DIR}/config/settings.yaml"
+echo "2. 📝 Проверьте конфиг: sudo nano ${BOT_DIR}/config/settings.yaml"
+echo "   (должны быть плейсхолдеры \${HELIUS_API_KEY} и \${PUBLIC_KEY})"
 echo ""
 echo "3. 🚀 Запустите: sudo systemctl start ${BOT_SERVICE}"
-echo "   sudo journalctl -u ${BOT_SERVICE} -f"
+echo "   Логи: sudo journalctl -u ${BOT_SERVICE} -f"
+echo ""
+echo "4. 🛑 Остановить: sudo systemctl stop ${BOT_SERVICE}"
+echo "   Статус: sudo systemctl status ${BOT_SERVICE}"

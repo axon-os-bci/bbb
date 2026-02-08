@@ -11,23 +11,34 @@
 - **Jupiter Price API**: Получает реальные цены для расчета TP/SL
 - **SQLite**: Сохраняет историю и восстанавливается после перезапуска
 
-## Установка
 
-```bash
-python3.12 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
 ## Настройка
 1. Получите API ключ от Helius (бесплатный тариф)
 2. Отредактируйте config/settings.yaml:
-- **Вставьте API ключ в поля http/ws**
-- **Укажите свой публичный адрес**
-3. Создайте config/wallet.key с приватным ключом в base58:
+- **Вставьте API ключ в .env**
+- **Укажите d .env свой публичный адрес**
+
+## Установка
 ```bash
-Copy
-echo "ВАШ_ПРИВАТНЫЙ_КЛЮЧ" > config/wallet.key
-chmod 600 config/wallet.key
+# Из root, создаем временную папку для установки
+mkdir ~/gmgn_deploy && cd ~/gmgn_deploy
+# Копируем в деплой-скрипт нужный файл
+nano deploy.sh
+# Создаем .env файл - нужен для подгрузки файлов из репозитория
+nano .env
+# Запускаем
+chmod +x deploy.sh
+./deploy.sh
+```
+
+## ОБЯЗАТЕЛЬНО ПОСЛЕ УСТАНОВКИ!
+```
+# Создаем wallet.key с приватным ключом в base58 и меняем права
+sudo chmod 600 /opt/gmgn_bot/config/wallet.key
+sudo chown solbot:solbot /opt/gmgn_bot/config/wallet.key
+# Создаем .emv и меняем права
+sudo chmod 600 /opt/gmgn_bot/.env
+sudo chown solbot:solbot /opt/gmgn_bot/.env
 ```
 
 ## Схема базы данных 
@@ -43,7 +54,7 @@ pool_id           -- Идентификатор пула Raydium
 
 ## Запуск
 ```bash
-python main.py
+systemctl start gmgn-bot
 ```
 
 ## Как это работает
@@ -114,28 +125,6 @@ OKX использует стандартный ED25519 для Solana, так ч
 
 3. Инструкция по эксплуатации
 
-Первоначальная настройка
-```bash
-# 1. Копируете скрипт deploy.sh на сервер
-scp deploy.sh root@your-server-ip:/root/
-
-# 2. Распаковываете архив с ботом в /tmp
-scp gmgn_bot_final.zip root@your-server-ip:/tmp/
-ssh root@your-server-ip "cd /tmp && unzip gmgn_bot_final.zip"
-
-# 3. Запускаете деплой
-ssh root@your-server-ip "cd /root && chmod +x deploy.sh && ./deploy.sh"
-
-# 4. Копируете ваш ключ (С ПРАВИЛЬНЫМИ ПРАВАМИ!)
-scp wallet.key root@your-server-ip:/opt/gmgn_bot/config/
-ssh root@your-server-ip "chmod 600 /opt/gmgn_bot/config/wallet.key && chown solbot:solbot /opt/gmgn_bot/config/wallet.key"
-
-# 5. Настраиваете конфиг (вставляете API ключ Helius)
-ssh root@your-server-ip "nano /opt/gmgn_bot/config/settings.yaml"
-
-# 6. Запуск
-ssh root@your-server-ip "systemctl start gmgn-bot"
-```
 
 Ежедневное управление
 ```bash

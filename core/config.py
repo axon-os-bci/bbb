@@ -48,7 +48,7 @@ class CopyTradingConfig(BaseModel):
     """Настройки копитрейдинга"""
     enabled: bool = False
     mode: str = "fixed"
-    fixed_amount_sol: float = 0.1
+    fixed_amount_sol: float = 0.25
     max_sol_per_trade: float = 0.5
     delay_ms: int = 2000
     target_wallets: List[str] = Field(default_factory=list)
@@ -62,8 +62,8 @@ class CopyTradingConfig(BaseModel):
 
 
 class EntryConfig(BaseModel):
-    position_size_sol: float = 0.1
-    min_liquidity_sol: float = 5.0
+    position_size_sol: float = 0.5
+    min_liquidity_sol: float = 20.0
 
 
 class FiltersConfig(BaseModel):
@@ -80,9 +80,9 @@ class StrategyConfig(BaseModel):
 
 
 class ExitConfig(BaseModel):
-    take_profit_percent: float = 50.0
-    stop_loss_percent: float = 10.0
-    max_hold_time_min: int = 60
+    take_profit_percent: float = 98.0
+    stop_loss_percent: float = 50.0
+    max_hold_time_min: int = 720
 
 
 class FeesConfig(BaseModel):
