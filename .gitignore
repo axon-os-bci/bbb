@@ -1,4 +1,3 @@
 config/wallet.key
 __pycache__/
 .env
-bash.txt
